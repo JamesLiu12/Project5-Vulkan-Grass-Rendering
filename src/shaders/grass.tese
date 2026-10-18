@@ -15,6 +15,8 @@ layout(location = 1) in vec4 tcV1[];
 layout(location = 2) in vec4 tcV2[];
 layout(location = 3) in vec3 tcHalfWidth[];
 
+layout(location = 0) out vec3 fragNormal;
+
 void main() {
     float u = gl_TessCoord.x;
     float v = gl_TessCoord.y;
@@ -26,9 +28,21 @@ void main() {
     vec3 p1 = tcV1[0].xyz;
     vec3 p2 = tcV2[0].xyz;
 
-    vec3 c = oneMinusV * oneMinusV * p0 + 2.0 * oneMinusV * v * p1 + v * v * p2;
+    vec3 a = p0 + v * (p1 - p0);
+    vec3 b = p1 + v * (p2 - p1);
+    vec3 c = a + v * (b - a);
 
-    vec3 worldPos = c + (2.0 * u - 1.0) * tcHalfWidth[0];
+    vec3 worldPos = c + (2.0 * u - 1.0) * oneMinusV * tcHalfWidth[0];
+
+    vec3 t0 = b - a;
+
+    if (dot(t0, t0) < 1e-3) {
+        t0 = p1 - p0;
+    }
+
+    vec3 t1 = tcHalfWidth[0];
+
+    fragNormal = normalize(cross(t0, t1));
 
     gl_Position = camera.proj * camera.view * vec4(worldPos, 1.0);
 }
