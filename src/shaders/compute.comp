@@ -26,7 +26,7 @@ struct Blade {
 // 2. Write out the culled blades
 // 3. Write the total number of blades remaining
 
-layout(set = 2, binding = 0) readonly buffer InputBlades {
+layout(set = 2, binding = 0) buffer InputBlades {
     Blade[] blades;
 } inBlades;
 
@@ -62,6 +62,51 @@ void main() {
     barrier(); // Wait till all threads reach this point
 
     // TODO: Apply forces on every blade and update the vertices in the buffer
+
+    Blade blade = inBlades.blades[index];
+
+    vec3 p0 = blade.v0.xyz;
+    vec3 p2 = blade.v2.xyz;
+    vec3 bladeUp = normalize(blade.up.xyz);
+    float height = blade.v1.w;
+
+    vec3 reference = abs(bladeUp.z) < 0.99
+        ? vec3(0.0, 0.0, 1.0)
+        : vec3(0.0, 1.0, 0.0);
+
+    vec3 axisX = normalize(cross(bladeUp, reference));
+    vec3 axisZ = normalize(cross(axisX, bladeUp));
+    float angle = blade.v0.w;
+
+    vec3 bladeDir = cos(angle) * axisX + sin(angle) * axisZ;
+    vec3 front = normalize(cross(bladeUp, bladeDir));
+
+    vec4 gravityDirection = vec4(0.0, -1.0, 0.0, 9.8);
+    vec3 environmentalGravity = normalize(gravityDirection.xyz) * gravityDirection.w;
+    vec3 gravity = environmentalGravity + 0.25 * length(environmentalGravity) * front;
+
+    vec3 initialP2 = p0 + bladeUp * height;
+    vec3 recovery = (initialP2 - p2) * blade.up.w;
+
+    p2 += (gravity + recovery) * deltaTime;
+
+    p2 -= bladeUp * min(dot(bladeUp, p2 - p0), 0.0);
+
+    vec3 offset = p2 - p0;
+    float projectedLength = length(offset - bladeUp * dot(offset, bladeUp));
+    float ratio = projectedLength / height;
+    vec3 p1 = p0 + bladeUp * height * max(1.0 - ratio, 0.05 * max(ratio, 1.0));
+
+    float chordLength = length(p2 - p0);
+    float controlLength = length(p1 - p0) + length(p2 - p1);
+    float curveLength = (2.0 * chordLength + controlLength) / 3.0;
+    float scale = height / max(curveLength, 1e-6);
+
+    blade.v1.xyz = p0 + (p1 - p0) * scale;
+    blade.v2.xyz = p0 + (p2 - p0) * scale;
+
+    inBlades.blades[index] = blade;
+    culledBlades.blades[index] = blade;
 
     // TODO: Cull blades that are too far away or not in the camera frustum and write them
     // to the culled blades buffer
