@@ -20,6 +20,14 @@ layout(location = 1) out vec4 tcV1[];
 layout(location = 2) out vec4 tcV2[];
 layout(location = 3) out vec3 tcHalfWidth[];
 
+in gl_PerVertex {
+    vec4 gl_Position;
+} gl_in[];
+
+out gl_PerVertex {
+    vec4 gl_Position;
+} gl_out[];
+
 void main() {
 	// Don't move the origin location of the patch
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
