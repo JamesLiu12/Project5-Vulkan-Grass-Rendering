@@ -331,10 +331,11 @@ void Renderer::CreateModelDescriptorSets() {
         descriptorWrites[2 * i + 1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[2 * i + 1].descriptorCount = 1;
         descriptorWrites[2 * i + 1].pImageInfo = &imageInfo;
+
+        // Update descriptor sets
+        vkUpdateDescriptorSets(logicalDevice, 2, &descriptorWrites[2 * i], 0, nullptr);
     }
 
-    // Update descriptor sets
-    vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
 void Renderer::CreateGrassDescriptorSets() {
@@ -372,10 +373,10 @@ void Renderer::CreateGrassDescriptorSets() {
         descriptorWrites[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[i].descriptorCount = 1;
         descriptorWrites[i].pBufferInfo = &modelBufferInfo;
-    }
 
-    // Update descriptor sets
-    vkUpdateDescriptorSets(logicalDevice, count, descriptorWrites.data(), 0, nullptr);
+        // Update descriptor sets
+        vkUpdateDescriptorSets(logicalDevice, 1, &descriptorWrites[i], 0, nullptr);
+    }
 }
 
 void Renderer::CreateTimeDescriptorSet() {
@@ -459,10 +460,10 @@ void Renderer::CreateComputeDescriptorSets() {
             descriptorWrites[3 * i + j].descriptorCount = 1;
             descriptorWrites[3 * i + j].pBufferInfo = &bufferInfos[j];
         }
-    }
 
-    // Update descriptor sets
-    vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        // Update descriptor sets
+        vkUpdateDescriptorSets(logicalDevice, 3, &descriptorWrites[3 * i], 0, nullptr);
+    }
 }
 
 void Renderer::CreateGraphicsPipeline() {
