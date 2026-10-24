@@ -137,13 +137,13 @@ void main() {
     vec3 initialP2 = p0 + bladeUp * height;
     vec3 recovery = (initialP2 - p2) * blade.up.w;
 
-    vec3 windDirection = normalize(vec3(sin(totalTime * 0.1), cos(totalTime * 0.2), sin(totalTime * 0.3)));
+    vec3 windDirection = normalize(vec3(0.5 + 0.5 * sin(totalTime + p0.x), 0.0, 0.5 + 0.5 * sin(totalTime * 0.7 + p0.z)));
     float windFrequency = 0.5;
     float windSpeed = 1.0;
     vec3 noisePosition = (p0 - windDirection * windSpeed * totalTime) * windFrequency;
     float noiseValue = clamp(0.5 + 0.5 * noise3D(noisePosition), 0.0, 1.0);
-    float baseWindStrength = 3.0;
-    float noiseAmplitude = 5.0;
+    float baseWindStrength = 10.0;
+    float noiseAmplitude = 3.0;
     float windStrength = max(baseWindStrength + noiseAmplitude * (2.0 * noiseValue - 1.0), 0.0);
 
     vec3 bladeAxis = (p2 - p0) / max(length(p2 - p0), 1e-6);
