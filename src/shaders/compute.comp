@@ -151,7 +151,7 @@ void main() {
     float heightRatio = clamp(dot(p2 - p0, bladeUp) / height, 0.0, 1.0);
     vec3 wind = windDirection * windStrength * directionalAlignment * heightRatio;
 
-    p2 += (gravity + recovery + wind) * deltaTime;
+    p2 += (gravity + recovery + wind) * min(deltaTime, 1.0 / 30.0);
 
     p2 -= bladeUp * min(dot(bladeUp, p2 - p0), 0.0);
 
