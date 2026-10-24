@@ -96,17 +96,11 @@ float noise3D(vec3 p) {
 }
 
 void main() {
-    // Reset the number of blades to 0
     uint index = gl_GlobalInvocationID.x;
 
     if (index >= inBlades.blades.length()) {
         return;
     }
-
-    if (index == 0) {
-        numBlades.vertexCount = 0;
-    }
-    barrier(); // Wait till all threads reach this point
 
     // TODO: Apply forces on every blade and update the vertices in the buffer
 
@@ -167,19 +161,20 @@ void main() {
     blade.v2.xyz = p0 + (p2 - p0) * scale;
 
     inBlades.blades[index] = blade;
-    culledBlades.blades[index] = blade;
 
     // TODO: Cull blades that are too far away or not in the camera frustum and write them
     // to the culled blades buffer
     // Note: to do this, you will need to use an atomic operation to read and update numBlades.vertexCount
     // You want to write the visible blades to the buffer without write conflicts between threads
 
-    culledBlades.blades[index] = inBlades.blades[index];
+    vec3 viewPosition = (camera.view * vec4(p0, 1.0)).xyz;
+    vec3 viewDirection = normalize(viewPosition);
+    vec3 widthDirection = normalize(mat3(camera.view) * bladeDir);
 
-    if (index == 0) {
-        numBlades.vertexCount = inBlades.blades.length();
-        numBlades.instanceCount = 1;
-        numBlades.firstVertex = 0;
-        numBlades.firstInstance = 0;
+    if (abs(dot(viewDirection, widthDirection)) > 0.9) {
+        return;
     }
+
+    uint culledIndex = atomicAdd(numBlades.vertexCount, 1);
+    culledBlades.blades[culledIndex] = blade;
 }
