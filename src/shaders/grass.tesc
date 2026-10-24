@@ -38,12 +38,19 @@ void main() {
     tcV2[gl_InvocationID] = vV2[gl_InvocationID];
     tcHalfWidth[gl_InvocationID] = vHalfWidth[gl_InvocationID];
 
+    float nearDistance = 5.0;
+    float farDistance = 30.0;
+
+    float cameraDistance = length((camera.view * vec4(vV0[gl_InvocationID].xyz, 1.0)).xyz);
+    float lod = clamp((cameraDistance - nearDistance) / (farDistance - nearDistance), 0.0, 1.0);
+    float tessLevel = mix(8.0, 1.0, lod);
+
 	// TODO: Set level of tesselation
     gl_TessLevelInner[0] = 1.0;
-    gl_TessLevelInner[1] = 4.0;
+    gl_TessLevelInner[1] = tessLevel;
 
-    gl_TessLevelOuter[0] = 4.0;
+    gl_TessLevelOuter[0] = tessLevel;
     gl_TessLevelOuter[1] = 1.0;
-    gl_TessLevelOuter[2] = 4.0;
+    gl_TessLevelOuter[2] = tessLevel;
     gl_TessLevelOuter[3] = 1.0;
 }
