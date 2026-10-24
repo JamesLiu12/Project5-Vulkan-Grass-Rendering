@@ -48,6 +48,14 @@ bool inBounds(float value, float bounds) {
     return (value >= -bounds) && (value <= bounds);
 }
 
+bool inFrustum(vec3 position) {
+    vec4 clipPosition = camera.proj * camera.view * vec4(position, 1.0);
+    return clipPosition.w > 0.0 &&
+           inBounds(clipPosition.x, clipPosition.w) &&
+           inBounds(clipPosition.y, clipPosition.w) &&
+           clipPosition.z >= 0.0 && clipPosition.z <= clipPosition.w;
+}
+
 vec3 hash(vec3 p) {
     p = fract(p * vec3(0.1031, 0.1030, 0.0973));
     p += dot(p, p.yxz + 33.33);
@@ -172,6 +180,12 @@ void main() {
     vec3 widthDirection = normalize(mat3(camera.view) * bladeDir);
 
     if (abs(dot(viewDirection, widthDirection)) > 0.9) {
+        return;
+    }
+
+    vec3 midpoint = 0.25 * blade.v0.xyz + 0.5 * blade.v1.xyz + 0.25 * blade.v2.xyz;
+
+    if (!inFrustum(blade.v0.xyz) && !inFrustum(midpoint) && !inFrustum(blade.v2.xyz)) {
         return;
     }
 
