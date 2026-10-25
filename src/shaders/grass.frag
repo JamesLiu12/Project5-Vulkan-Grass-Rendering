@@ -9,6 +9,8 @@ layout(set = 0, binding = 0) uniform CameraBufferObject {
 // TODO: Declare fragment shader inputs
 
 layout(location = 0) in vec3 fragNormal;
+layout(location = 1) in float fragHeight;
+layout(location = 2) flat in float fragVariation;
 
 layout(location = 0) out vec4 outColor;
 
@@ -17,7 +19,11 @@ void main() {
 
     vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
     vec3 lightColor = vec3(1.0, 1.0, 1.0);
-    vec3 albedo = vec3(0.2, 0.55, 0.2);
+
+    vec3 rootColor = vec3(0.10, 0.30, 0.08);
+    vec3 tipColor = vec3(0.32, 0.65, 0.18);
+    vec3 albedo = mix(rootColor, tipColor, fragHeight);
+    albedo *= mix(0.9, 1.1, fragVariation);
 
     vec3 normal = normalize(fragNormal);
     float diffuse = abs(dot(normal, lightDir));

@@ -16,6 +16,8 @@ layout(location = 2) in vec4 tcV2[];
 layout(location = 3) in vec3 tcHalfWidth[];
 
 layout(location = 0) out vec3 fragNormal;
+layout(location = 1) out float fragHeight;
+layout(location = 2) flat out float fragVariation;
 
 void main() {
     float u = gl_TessCoord.x;
@@ -43,6 +45,8 @@ void main() {
     vec3 t1 = tcHalfWidth[0];
 
     fragNormal = normalize(cross(t0, t1));
+    fragHeight = v;
+    fragVariation = fract(sin(tcV0[0].w * 12.9898) * 43758.5453);
 
     gl_Position = camera.proj * camera.view * vec4(worldPos, 1.0);
 }
