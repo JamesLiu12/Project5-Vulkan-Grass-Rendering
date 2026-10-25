@@ -7,6 +7,9 @@ float generateRandomFloat() {
 }
 
 Blades::Blades(Device* device, VkCommandPool commandPool, float planeDim) : Model(device, commandPool, {}, {}) {
+    if (ExperimentConfig::ENABLED) {
+        std::srand(ExperimentConfig::RANDOM_SEED);
+    }
     std::vector<Blade> blades;
     blades.reserve(NUM_BLADES);
 

@@ -1,6 +1,16 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
+#ifndef ENABLE_ORIENTATION_CULLING
+#define ENABLE_ORIENTATION_CULLING 1
+#endif
+#ifndef ENABLE_FRUSTUM_CULLING
+#define ENABLE_FRUSTUM_CULLING 1
+#endif
+#ifndef ENABLE_DISTANCE_CULLING
+#define ENABLE_DISTANCE_CULLING 1
+#endif
+
 #define WORKGROUP_SIZE 32
 layout(local_size_x = WORKGROUP_SIZE, local_size_y = 1, local_size_z = 1) in;
 
@@ -175,20 +185,27 @@ void main() {
     // Note: to do this, you will need to use an atomic operation to read and update numBlades.vertexCount
     // You want to write the visible blades to the buffer without write conflicts between threads
 
+#if ENABLE_ORIENTATION_CULLING || ENABLE_DISTANCE_CULLING
     vec3 viewPosition = (camera.view * vec4(p0, 1.0)).xyz;
+#endif
+#if ENABLE_ORIENTATION_CULLING
     vec3 viewDirection = normalize(viewPosition);
     vec3 widthDirection = normalize(mat3(camera.view) * bladeDir);
 
     if (abs(dot(viewDirection, widthDirection)) > 0.9) {
         return;
     }
+#endif
 
+#if ENABLE_FRUSTUM_CULLING
     vec3 midpoint = 0.25 * blade.v0.xyz + 0.5 * blade.v1.xyz + 0.25 * blade.v2.xyz;
 
     if (!inFrustum(blade.v0.xyz) && !inFrustum(midpoint) && !inFrustum(blade.v2.xyz)) {
         return;
     }
+#endif
 
+#if ENABLE_DISTANCE_CULLING
     float maxDistance = 40.0;
     uint bucketCount = 4;
 
@@ -199,6 +216,7 @@ void main() {
     if (index % bucketCount < bucket) {
         return;
     }
+#endif
 
     uint culledIndex = atomicAdd(numBlades.vertexCount, 1);
     culledBlades.blades[culledIndex] = blade;

@@ -1,6 +1,13 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
+#ifndef ENABLE_TESSELLATION_LOD
+#define ENABLE_TESSELLATION_LOD 1
+#endif
+#ifndef FIXED_TESS_LEVEL
+#define FIXED_TESS_LEVEL 8.0
+#endif
+
 layout(vertices = 1) out;
 
 layout(set = 0, binding = 0) uniform CameraBufferObject {
@@ -38,12 +45,16 @@ void main() {
     tcV2[gl_InvocationID] = vV2[gl_InvocationID];
     tcHalfWidth[gl_InvocationID] = vHalfWidth[gl_InvocationID];
 
+#if ENABLE_TESSELLATION_LOD
     float nearDistance = 5.0;
     float farDistance = 30.0;
 
     float cameraDistance = length((camera.view * vec4(vV0[gl_InvocationID].xyz, 1.0)).xyz);
     float lod = clamp((cameraDistance - nearDistance) / (farDistance - nearDistance), 0.0, 1.0);
     float tessLevel = mix(8.0, 1.0, lod);
+#else
+    float tessLevel = FIXED_TESS_LEVEL;
+#endif
 
 	// TODO: Set level of tesselation
     gl_TessLevelInner[0] = 1.0;

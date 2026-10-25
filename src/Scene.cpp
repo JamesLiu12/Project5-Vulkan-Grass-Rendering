@@ -1,5 +1,6 @@
 #include "Scene.h"
 #include "BufferUtils.h"
+#include "ExperimentConfig.h"
 
 Scene::Scene(Device* device) : device(device) {
     BufferUtils::CreateBuffer(device, sizeof(Time), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, timeBuffer, timeBufferMemory);
@@ -32,7 +33,7 @@ void Scene::UpdateTime() {
     duration<float> nextDeltaTime = duration_cast<duration<float>>(currentTime - startTime);
     startTime = currentTime;
 
-    time.deltaTime = nextDeltaTime.count();
+    time.deltaTime = ExperimentConfig::ENABLED ? ExperimentConfig::FIXED_DELTA_TIME : nextDeltaTime.count();
     time.totalTime += time.deltaTime;
 
     memcpy(mappedData, &time, sizeof(Time));
@@ -45,7 +46,8 @@ void Scene::UpdateSun() {
     const float nightMargin = 0.25f;
     const float cycleArc = pi + 2.0f * nightMargin;
 
-    float angle = std::fmod(time.totalTime * (cycleArc / dayDuration) + 0.25f + nightMargin, cycleArc) - nightMargin;
+    float sunTime = ExperimentConfig::ENABLED ? ExperimentConfig::SUN_TIME : time.totalTime;
+    float angle = std::fmod(sunTime * (cycleArc / dayDuration) + 0.25f + nightMargin, cycleArc) - nightMargin;
 
     glm::vec3 direction(0.0f, std::sin(angle), -std::cos(angle));
 
