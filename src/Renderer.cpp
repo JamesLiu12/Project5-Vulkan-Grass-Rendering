@@ -28,7 +28,8 @@ Renderer::Renderer(Device* device, SwapChain* swapChain, Scene* scene, Camera* c
     CreateTimeDescriptorSet();
     CreateComputeDescriptorSets();
     CreateFrameResources();
-    CreateGraphicsPipeline();
+    CreateGraphicsPipeline(false);
+    CreateGraphicsPipeline(true);
     CreateGrassPipeline();
     CreateComputePipeline();
     RecordCommandBuffers();
@@ -131,7 +132,11 @@ void Renderer::CreateCameraDescriptorSetLayout() {
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_ALL;
     uboLayoutBinding.pImmutableSamplers = nullptr;
 
-    std::vector<VkDescriptorSetLayoutBinding> bindings = { uboLayoutBinding };
+    VkDescriptorSetLayoutBinding sunLayoutBinding = uboLayoutBinding;
+    sunLayoutBinding.binding = 1;
+    sunLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings = { uboLayoutBinding, sunLayoutBinding };
 
     // Create the descriptor set layout
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
@@ -222,8 +227,8 @@ void Renderer::CreateComputeDescriptorSetLayout() {
 void Renderer::CreateDescriptorPool() {
     // Describe which descriptor types that the descriptor sets will contain
     std::vector<VkDescriptorPoolSize> poolSizes = {
-        // Camera
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , 1},
+        // Camera + Sun
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER , 2},
 
         // Models + Blades
         { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER , static_cast<uint32_t>(scene->GetModels().size() + scene->GetBlades().size()) },
@@ -264,21 +269,24 @@ void Renderer::CreateCameraDescriptorSet() {
     }
 
     // Configure the descriptors to refer to buffers
-    VkDescriptorBufferInfo cameraBufferInfo = {};
-    cameraBufferInfo.buffer = camera->GetBuffer();
-    cameraBufferInfo.offset = 0;
-    cameraBufferInfo.range = sizeof(CameraBufferObject);
+    std::array<VkDescriptorBufferInfo, 2> bufferInfos = {};
 
-    std::array<VkWriteDescriptorSet, 1> descriptorWrites = {};
-    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = cameraDescriptorSet;
-    descriptorWrites[0].dstBinding = 0;
-    descriptorWrites[0].dstArrayElement = 0;
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].pBufferInfo = &cameraBufferInfo;
-    descriptorWrites[0].pImageInfo = nullptr;
-    descriptorWrites[0].pTexelBufferView = nullptr;
+    bufferInfos[0].buffer = camera->GetBuffer();
+    bufferInfos[0].range = sizeof(CameraBufferObject);
+
+    bufferInfos[1].buffer = scene->GetSunBuffer();
+    bufferInfos[1].range = sizeof(Sun);
+
+    std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+
+    for (uint32_t i = 0; i < 2; ++i) {
+        descriptorWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[i].dstSet = cameraDescriptorSet;
+        descriptorWrites[i].dstBinding = i;
+        descriptorWrites[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[i].descriptorCount = 1;
+        descriptorWrites[i].pBufferInfo = &bufferInfos[i];
+    }
 
     // Update descriptor sets
     vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
@@ -466,9 +474,12 @@ void Renderer::CreateComputeDescriptorSets() {
     }
 }
 
-void Renderer::CreateGraphicsPipeline() {
-    VkShaderModule vertShaderModule = ShaderModule::Create("shaders/graphics.vert.spv", logicalDevice);
-    VkShaderModule fragShaderModule = ShaderModule::Create("shaders/graphics.frag.spv", logicalDevice);
+void Renderer::CreateGraphicsPipeline(bool sky) {
+    VkPipelineLayout& pipelineLayout = sky ? skyPipelineLayout : graphicsPipelineLayout;
+    VkPipeline& pipeline = sky ? skyPipeline : graphicsPipeline;
+
+    VkShaderModule vertShaderModule = ShaderModule::Create(sky ? "shaders/sky.vert.spv" : "shaders/graphics.vert.spv", logicalDevice);
+    VkShaderModule fragShaderModule = ShaderModule::Create(sky ? "shaders/sky.frag.spv" : "shaders/graphics.frag.spv", logicalDevice);
 
     // Assign each shader module to the appropriate stage in the pipeline
     VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
@@ -494,10 +505,12 @@ void Renderer::CreateGraphicsPipeline() {
     auto bindingDescription = Vertex::getBindingDescription();
     auto attributeDescriptions = Vertex::getAttributeDescriptions();
 
-    vertexInputInfo.vertexBindingDescriptionCount = 1;
-    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+    if (!sky) {
+        vertexInputInfo.vertexBindingDescriptionCount = 1;
+        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+        vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+    }
 
     // Input assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
@@ -532,7 +545,7 @@ void Renderer::CreateGraphicsPipeline() {
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode = sky ? VK_CULL_MODE_NONE : VK_CULL_MODE_BACK_BIT;
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;
@@ -552,8 +565,8 @@ void Renderer::CreateGraphicsPipeline() {
     // Depth testing
     VkPipelineDepthStencilStateCreateInfo depthStencil = {};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_TRUE;
-    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthTestEnable = sky ? VK_FALSE : VK_TRUE;
+    depthStencil.depthWriteEnable = sky ? VK_FALSE : VK_TRUE;
     depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.minDepthBounds = 0.0f;
@@ -594,7 +607,7 @@ void Renderer::CreateGraphicsPipeline() {
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = 0;
 
-    if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &graphicsPipelineLayout) != VK_SUCCESS) {
+    if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create pipeline layout");
     }
 
@@ -611,13 +624,13 @@ void Renderer::CreateGraphicsPipeline() {
     pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = nullptr;
-    pipelineInfo.layout = graphicsPipelineLayout;
+    pipelineInfo.layout = pipelineLayout;
     pipelineInfo.renderPass = renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
 
-    if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create graphics pipeline");
     }
 
@@ -945,12 +958,15 @@ void Renderer::DestroyFrameResources() {
 void Renderer::RecreateFrameResources() {
     vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
     vkDestroyPipeline(logicalDevice, grassPipeline, nullptr);
+    vkDestroyPipeline(logicalDevice, skyPipeline, nullptr);
     vkDestroyPipelineLayout(logicalDevice, graphicsPipelineLayout, nullptr);
     vkDestroyPipelineLayout(logicalDevice, grassPipelineLayout, nullptr);
+    vkDestroyPipelineLayout(logicalDevice, skyPipelineLayout, nullptr);
     vkFreeCommandBuffers(logicalDevice, graphicsCommandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 
     DestroyFrameResources();
     CreateFrameResources();
+    CreateGraphicsPipeline(false);
     CreateGraphicsPipeline();
     CreateGrassPipeline();
     RecordCommandBuffers();
@@ -1072,6 +1088,10 @@ void Renderer::RecordCommandBuffers() {
 
         vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+        vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, skyPipeline);
+        vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, skyPipelineLayout, 0, 1, &cameraDescriptorSet, 0, nullptr);
+        vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+
         // Bind the graphics pipeline
         vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
@@ -1120,6 +1140,8 @@ void Renderer::RecordCommandBuffers() {
 }
 
 void Renderer::Frame() {
+
+    scene->UpdateSun();
 
     VkSubmitInfo computeSubmitInfo = {};
     computeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1173,10 +1195,12 @@ Renderer::~Renderer() {
     vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
     vkDestroyPipeline(logicalDevice, grassPipeline, nullptr);
     vkDestroyPipeline(logicalDevice, computePipeline, nullptr);
+    vkDestroyPipeline(logicalDevice, skyPipeline, nullptr);
 
     vkDestroyPipelineLayout(logicalDevice, graphicsPipelineLayout, nullptr);
     vkDestroyPipelineLayout(logicalDevice, grassPipelineLayout, nullptr);
     vkDestroyPipelineLayout(logicalDevice, computePipelineLayout, nullptr);
+    vkDestroyPipelineLayout(logicalDevice, skyPipelineLayout, nullptr);
 
     vkDestroyDescriptorSetLayout(logicalDevice, cameraDescriptorSetLayout, nullptr);
     vkDestroyDescriptorSetLayout(logicalDevice, modelDescriptorSetLayout, nullptr);

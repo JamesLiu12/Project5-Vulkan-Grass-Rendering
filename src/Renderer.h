@@ -28,7 +28,7 @@ public:
     void CreateTimeDescriptorSet();
     void CreateComputeDescriptorSets();
 
-    void CreateGraphicsPipeline();
+    void CreateGraphicsPipeline(bool sky = true);
     void CreateGrassPipeline();
     void CreateComputePipeline();
 
@@ -69,10 +69,12 @@ private:
     VkPipelineLayout graphicsPipelineLayout;
     VkPipelineLayout grassPipelineLayout;
     VkPipelineLayout computePipelineLayout;
+    VkPipelineLayout skyPipelineLayout;
 
     VkPipeline graphicsPipeline;
     VkPipeline grassPipeline;
     VkPipeline computePipeline;
+    VkPipeline skyPipeline;
 
     std::vector<VkImageView> imageViews;
     VkImage depthImage;
